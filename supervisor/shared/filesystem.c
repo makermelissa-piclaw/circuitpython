@@ -254,9 +254,17 @@ void filesystem_set_writable_by_usb(fs_user_mount_t *vfs, bool usb_writable) {
 }
 
 bool filesystem_is_writable_by_python(fs_user_mount_t *vfs) {
+    // The blockdev's LOCKED flag is set when a real USB host has probed
+    // the MSC interface (via tud_msc_is_writable_cb) and grabbed the
+    // blockdev lock. While LOCKED is clear, no host owns the filesystem,
+    // so Python writes are safe even on a USB-device-capable board.
+    // This fixes #10972: BLE-FT renames and web workflow PUTs failing
+    // with FR_WRITE_PROTECTED when the board is on battery / USB power
+    // adapter with no host present.
     return ((vfs->blockdev.flags & MP_BLOCKDEV_FLAG_CONCURRENT_WRITE_PROTECTED) == 0) ||
            ((vfs->blockdev.flags & MP_BLOCKDEV_FLAG_USB_WRITABLE) == 0) ||
-           ((vfs->blockdev.flags & MP_BLOCKDEV_FLAG_IGNORE_WRITE_PROTECTION) != 0);
+           ((vfs->blockdev.flags & MP_BLOCKDEV_FLAG_IGNORE_WRITE_PROTECTION) != 0) ||
+           ((vfs->blockdev.flags & MP_BLOCKDEV_FLAG_LOCKED) == 0);
 }
 
 bool filesystem_is_writable_by_usb(fs_user_mount_t *vfs) {
